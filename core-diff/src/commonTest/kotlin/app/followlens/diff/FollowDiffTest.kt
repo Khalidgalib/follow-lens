@@ -1,0 +1,89 @@
+package app.followlens.diff
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+private fun followersJson(vararg usernames: String): String =
+    usernames.joinToString(prefix = "[", postfix = "]") { u ->
+        """{"string_list_data":[{"href":"https://instagram.com/$u","value":"$u","timestamp":1700000000}]}"""
+    }
+
+private fun followingJson(vararg usernames: String): String =
+    usernames.joinToString(prefix = """{"relationships_following":[""", postfix = "]}") { u ->
+        """{"string_list_data":[{"href":"https://instagram.com/$u","value":"$u","timestamp":1700000001}]}"""
+    }
+
+class FollowDiffTest {
+
+    private val parser = ExportParser()
+
+    @Test
+    fun notFollowingBack_isFollowingMinusFollowers() {
+        val snap = parser.parseSnapshot(
+            followingFileContent = followingJson("alice", "bob", "carol"),
+            followersJson("alice", "dave"),
+        )
+        val result = FollowDiff.compare(snap)
+        assertEquals(listOf("bob", "carol"), result.notFollowingBack.map { it.username })
+        assertEquals(listOf("dave"), result.fans.map { it.username })
+        assertEquals(listOf("alice"), result.mutuals.map { it.username })
+    }
+
+    @Test
+    fun compare_isCaseInsensitive() {
+        val snap = parser.parseSnapshot(
+            followingFileContent = followingJson("Alice", "BOB"),
+            followersJson("alice"),
+        )
+        val result = FollowDiff.compare(snap)
+        assertEquals(listOf("bob"), result.notFollowingBack.map { it.username })
+    }
+
+    @Test
+    fun whitelist_removesFromNotFollowingBack() {
+        val snap = parser.parseSnapshot(
+            followingFileContent = followingJson("bob", "carol"),
+            followersJson(),
+        )
+        val result = FollowDiff.compare(snap, whitelist = setOf("bob"))
+        assertEquals(listOf("carol"), result.notFollowingBack.map { it.username })
+    }
+
+    @Test
+    fun parseFollowers_mergesMultipleParts_andDeDupes() {
+        val followers = parser.parseFollowers(
+            followersJson("a", "b"),
+            followersJson("b", "c"),
+        )
+        assertEquals(setOf("a", "b", "c"), followers.map { it.username }.toSet())
+    }
+
+    @Test
+    fun parser_skipsDeactivatedAccountsWithEmptyValue() {
+        val json = """[
+            {"string_list_data":[{"href":"","value":"","timestamp":0}]},
+            {"string_list_data":[{"href":"https://instagram.com/real","value":"real","timestamp":1}]}
+        ]"""
+        val followers = parser.parseFollowers(json)
+        assertEquals(setOf("real"), followers.map { it.username }.toSet())
+    }
+
+    @Test
+    fun parser_rejectsEmptyAndCorruptInput() {
+        assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("") }
+        assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("{ not json") }
+    }
+
+    @Test
+    fun delta_detectsGainedAndLost() {
+        val prev = parser.parseSnapshot(followingJson("x"), followersJson("a", "b"))
+        val cur = parser.parseSnapshot(followingJson("x", "y"), followersJson("b", "c"))
+        val d = FollowDiff.delta(prev, cur)
+        assertEquals(listOf("c"), d.newFollowers.map { it.username })
+        assertEquals(listOf("a"), d.lostFollowers.map { it.username })
+        assertEquals(listOf("y"), d.newlyFollowed.map { it.username })
+        assertTrue(d.youUnfollowed.isEmpty())
+    }
+}

@@ -1,0 +1,63 @@
+-- FollowLens local store. On-device only in v1; the same rows sync to the backend later.
+
+CREATE TABLE snapshot (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    taken_at_seconds  INTEGER NOT NULL,          -- when the user imported it
+    exported_at_seconds INTEGER                  -- when Instagram generated the export, if known
+);
+
+CREATE TABLE account (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    username  TEXT NOT NULL UNIQUE               -- always stored lower-cased
+);
+
+CREATE TABLE snapshot_account (
+    snapshot_id  INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
+    account_id   INTEGER NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+    role         TEXT NOT NULL,                  -- 'FOLLOWER' | 'FOLLOWING'
+    since_seconds INTEGER,
+    PRIMARY KEY (snapshot_id, account_id, role)
+);
+
+CREATE TABLE whitelist (
+    account_id   INTEGER NOT NULL PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+    added_at_seconds INTEGER NOT NULL
+);
+
+-- --- queries ---
+
+insertSnapshot:
+INSERT INTO snapshot(taken_at_seconds, exported_at_seconds) VALUES (?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+upsertAccount:
+INSERT INTO account(username) VALUES (?) ON CONFLICT(username) DO NOTHING;
+
+accountIdByUsername:
+SELECT id FROM account WHERE username = ?;
+
+linkAccountToSnapshot:
+INSERT OR REPLACE INTO snapshot_account(snapshot_id, account_id, role, since_seconds)
+VALUES (?, ?, ?, ?);
+
+latestSnapshot:
+SELECT * FROM snapshot ORDER BY taken_at_seconds DESC LIMIT 1;
+
+accountsForSnapshot:
+SELECT a.username, sa.since_seconds
+FROM snapshot_account sa JOIN account a ON a.id = sa.account_id
+WHERE sa.snapshot_id = ? AND sa.role = ?;
+
+allWhitelistUsernames:
+SELECT a.username FROM whitelist w JOIN account a ON a.id = w.account_id;
+
+addToWhitelist:
+INSERT OR IGNORE INTO whitelist(account_id, added_at_seconds) VALUES (?, ?);
+
+removeFromWhitelist:
+DELETE FROM whitelist WHERE account_id = ?;
+
+clearAllData:
+DELETE FROM snapshot;
