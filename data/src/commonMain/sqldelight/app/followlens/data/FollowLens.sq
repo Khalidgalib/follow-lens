@@ -59,5 +59,13 @@ INSERT OR IGNORE INTO whitelist(account_id, added_at_seconds) VALUES (?, ?);
 removeFromWhitelist:
 DELETE FROM whitelist WHERE account_id = ?;
 
-clearAllData:
-DELETE FROM snapshot;
+-- Wipe everything (privacy "reset"). Deleted table-by-table rather than relying on
+-- ON DELETE CASCADE: SQLite only enforces foreign keys when PRAGMA foreign_keys=ON
+-- (SQLDelight drivers don't set it by default), and whitelist/account aren't children
+-- of snapshot anyway.
+clearAllData {
+    DELETE FROM snapshot_account;
+    DELETE FROM whitelist;
+    DELETE FROM snapshot;
+    DELETE FROM account;
+}
