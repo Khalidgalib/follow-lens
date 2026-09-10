@@ -33,7 +33,7 @@ lastInsertedId:
 SELECT last_insert_rowid();
 
 upsertAccount:
-INSERT INTO account(username) VALUES (?) ON CONFLICT(username) DO NOTHING;
+INSERT OR IGNORE INTO account(username) VALUES (?);
 
 accountIdByUsername:
 SELECT id FROM account WHERE username = ?;
