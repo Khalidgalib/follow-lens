@@ -8,19 +8,42 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(21)
+
     androidTarget()
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    jvm("desktop")   // dev-only harness: `./gradlew :app:run` to see the UI on this machine
 
     sourceSets {
         commonMain.dependencies {
             implementation(project(":core-diff"))
             implementation(project(":data"))
+            implementation(libs.kotlinx.datetime)
             implementation(compose.runtime)
             implementation(compose.foundation)
+            implementation(compose.ui)
             implementation(compose.material3)
             implementation(compose.components.resources)
+        }
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+        }
+        val desktopMain by getting
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
+        }
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = "app.followlens.DesktopAppKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg)
+            packageName = "FollowLens"
+            packageVersion = "1.0.0"
         }
     }
 }
@@ -36,4 +59,8 @@ android {
         versionName = "0.1.0"
     }
     // v1 is offline: do NOT add android.permission.INTERNET to the manifest.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
 }
