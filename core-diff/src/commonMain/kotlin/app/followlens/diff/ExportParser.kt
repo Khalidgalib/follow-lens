@@ -26,9 +26,10 @@ import kotlinx.serialization.json.longOrNull
  * The caller is responsible for unzipping and locating the files (platform-specific). This class
  * only turns raw JSON text into [Account] sets.
  */
-class ExportParser(
-    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
-) {
+class ExportParser {
+
+    // Kept private so core-diff's choice of JSON library stays out of its public API.
+    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     class ParseException(message: String) : Exception(message)
 
@@ -91,7 +92,8 @@ class ExportParser(
             if (rawValue.isNullOrBlank()) continue
             val ts = first["timestamp"]?.jsonPrimitive?.longOrNull
             val account = Account.of(rawValue, ts?.takeIf { it > 0 })
-            out.putIfAbsent(account.username, account)   // de-dupe, keep first occurrence
+            // de-dupe, keep first occurrence (putIfAbsent is JVM-only, so do it by hand)
+            if (account.username !in out) out[account.username] = account
         }
     }
 

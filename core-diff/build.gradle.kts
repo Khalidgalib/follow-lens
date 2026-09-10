@@ -5,6 +5,8 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(21)
+
     jvm()            // used by unit tests now, and by the future Spring Boot backend
     androidTarget()
     iosX64()
@@ -26,4 +28,8 @@ android {
     namespace = "app.followlens.diff"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig { minSdk = libs.versions.android.minSdk.get().toInt() }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
 }
