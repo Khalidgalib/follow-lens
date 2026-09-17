@@ -16,12 +16,21 @@ import kotlinx.serialization.json.longOrNull
  *   - `followers_1.json` (and `_2`, ...) — a TOP-LEVEL JSON ARRAY of entries
  *   - `following.json` — an OBJECT with key `relationships_following` -> array of entries
  *
- * Each entry:
+ * Each entry, in `followers_1.json`:
  * ```
- * { "string_list_data": [
+ * { "title": "", "string_list_data": [
  *     { "href": "https://www.instagram.com/USERNAME", "value": "USERNAME", "timestamp": 1700000000 }
  * ]}
  * ```
+ * `following.json` entries carry the username differently — `string_list_data[0]` has no `value`,
+ * `href` is shaped `.../_u/USERNAME`, and the username is instead the entry's own `title`:
+ * ```
+ * { "title": "USERNAME", "string_list_data": [
+ *     { "href": "https://www.instagram.com/_u/USERNAME", "timestamp": 1700000000 }
+ * ]}
+ * ```
+ * [collectEntries] tries `value`, then `title`, then parses `href` as a last resort, so both
+ * shapes (and any file that mixes them) work.
  *
  * The caller is responsible for unzipping and locating the files (platform-specific). This class
  * only turns raw JSON text into [Account] sets.
@@ -85,16 +94,33 @@ class ExportParser {
 
     private fun collectEntries(entries: JsonArray, out: MutableMap<String, Account>) {
         for (entry in entries) {
-            val sld = entry.jsonObject["string_list_data"]?.jsonArray ?: continue
+            val entryObject = entry.jsonObject
+            val sld = entryObject["string_list_data"]?.jsonArray ?: continue
             val first = sld.firstOrNull()?.jsonObject ?: continue
-            val rawValue = first["value"]?.jsonPrimitive?.contentOrNull()
-            // Deactivated / deleted accounts show up with an empty "value" — skip them.
-            if (rawValue.isNullOrBlank()) continue
+
+            // followers_1.json puts the username in string_list_data[0].value. following.json
+            // (as of the 2026 export format) omits "value" entirely and puts it in the entry's
+            // own "title" instead, with href shaped ".../_u/USERNAME" rather than ".../USERNAME".
+            // Deactivated/deleted accounts have none of these — skip them.
+            val rawValue = first["value"]?.jsonPrimitive?.contentOrNull()?.takeIf { it.isNotBlank() }
+                ?: entryObject["title"]?.jsonPrimitive?.contentOrNull()?.takeIf { it.isNotBlank() }
+                ?: usernameFromHref(first["href"]?.jsonPrimitive?.contentOrNull())
+                ?: continue
+
             val ts = first["timestamp"]?.jsonPrimitive?.longOrNull
             val account = Account.of(rawValue, ts?.takeIf { it > 0 })
             // de-dupe, keep first occurrence (putIfAbsent is JVM-only, so do it by hand)
             if (account.username !in out) out[account.username] = account
         }
+    }
+
+    private fun usernameFromHref(href: String?): String? {
+        if (href.isNullOrBlank()) return null
+        return href.substringAfter("instagram.com/", "")
+            .trim('/')
+            .removePrefix("_u/")
+            .trim('/')
+            .ifBlank { null }
     }
 
     private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =

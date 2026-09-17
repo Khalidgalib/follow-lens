@@ -71,6 +71,27 @@ class FollowDiffTest {
     }
 
     @Test
+    fun parseFollowing_readsRealExportShape_titleInsteadOfValue() {
+        // following.json (2026 export format) omits string_list_data[0].value entirely and puts
+        // the username in the entry's own "title" instead, with an "_u/" segment in the href.
+        val json = """{"relationships_following":[
+            {"title":"abo_ni_","string_list_data":[{"href":"https://www.instagram.com/_u/abo_ni_","timestamp":1789572079}]},
+            {"title":"_samihaaa._","string_list_data":[{"href":"https://www.instagram.com/_u/_samihaaa._","timestamp":1789407849}]}
+        ]}"""
+        val following = parser.parseFollowing(json)
+        assertEquals(setOf("abo_ni_", "_samihaaa._"), following.map { it.username }.toSet())
+    }
+
+    @Test
+    fun parseFollowing_fallsBackToHref_whenNeitherValueNorTitlePresent() {
+        val json = """{"relationships_following":[
+            {"string_list_data":[{"href":"https://www.instagram.com/_u/onlyhref","timestamp":1700000000}]}
+        ]}"""
+        val following = parser.parseFollowing(json)
+        assertEquals(setOf("onlyhref"), following.map { it.username }.toSet())
+    }
+
+    @Test
     fun parser_rejectsEmptyAndCorruptInput() {
         assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("") }
         assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("{ not json") }

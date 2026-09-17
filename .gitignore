@@ -21,3 +21,7 @@ Pods/
 *.keystore
 *.jks
 secrets.properties
+
+# Personal Instagram export data (used for local debugging only — never commit real user data)
+/following.json
+/followers_*.json
