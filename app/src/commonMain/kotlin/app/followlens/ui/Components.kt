@@ -1,11 +1,14 @@
 package app.followlens.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,6 +106,53 @@ fun LazyListScope.sectionHeader(text: String) = item {
         color = FollowLensColors.textTertiary,
         modifier = Modifier.padding(top = 22.dp, bottom = 6.dp),
     )
+}
+
+/** Thin trailing-edge thumb showing where a [LazyColumn][androidx.compose.foundation.lazy.LazyColumn] is scrolled to. Hidden when the whole list already fits. */
+@Composable
+fun ScrollPositionIndicator(listState: LazyListState, modifier: Modifier = Modifier) {
+    val info = listState.layoutInfo
+    val totalItems = info.totalItemsCount
+    val visibleItems = info.visibleItemsInfo.size
+    if (totalItems == 0 || visibleItems >= totalItems) return
+
+    val thumbFraction = (visibleItems.toFloat() / totalItems).coerceIn(0.08f, 1f)
+    val scrollableItems = (totalItems - visibleItems).coerceAtLeast(1)
+    val firstIndex = info.visibleItemsInfo.firstOrNull()?.index ?: 0
+    val progress = (firstIndex.toFloat() / scrollableItems).coerceIn(0f, 1f)
+    ScrollTrack(progress = progress, thumbFraction = thumbFraction, modifier = modifier)
+}
+
+/** Same idea as the [LazyListState] overload, for a plain [ScrollState]-based scrolling [Column]. */
+@Composable
+fun ScrollPositionIndicator(scrollState: ScrollState, modifier: Modifier = Modifier) {
+    val max = scrollState.maxValue
+    if (max <= 0) return
+
+    val viewport = scrollState.viewportSize
+    val contentSize = viewport + max
+    if (contentSize <= 0) return
+
+    val thumbFraction = (viewport.toFloat() / contentSize).coerceIn(0.08f, 1f)
+    if (thumbFraction >= 1f) return
+    val progress = (scrollState.value.toFloat() / max).coerceIn(0f, 1f)
+    ScrollTrack(progress = progress, thumbFraction = thumbFraction, modifier = modifier)
+}
+
+@Composable
+private fun ScrollTrack(progress: Float, thumbFraction: Float, modifier: Modifier = Modifier) {
+    Canvas(modifier.width(4.dp).fillMaxHeight()) {
+        val corner = CornerRadius(size.width / 2f)
+        drawRoundRect(color = FollowLensColors.outline, cornerRadius = corner)
+        val thumbHeight = size.height * thumbFraction
+        val thumbTop = (size.height - thumbHeight) * progress
+        drawRoundRect(
+            color = FollowLensColors.accent,
+            topLeft = Offset(0f, thumbTop),
+            size = Size(size.width, thumbHeight),
+            cornerRadius = corner,
+        )
+    }
 }
 
 @Composable

@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -35,8 +37,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(whitelist: List<String>, onRemoveFromWhitelist: (String) -> Unit, onClearAllData: () -> Unit) {
     var confirmingReset by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    Row(Modifier.fillMaxSize()) {
+    LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 20.dp)) {
         item { ScreenHeader("Settings") }
 
         sectionHeader("WHITELIST · ${whitelist.size}")
@@ -89,6 +93,8 @@ fun SettingsScreen(whitelist: List<String>, onRemoveFromWhitelist: (String) -> U
                 modifier = Modifier.padding(bottom = 24.dp),
             )
         }
+    }
+    ScrollPositionIndicator(listState, Modifier.fillMaxHeight().padding(vertical = 8.dp, horizontal = 4.dp))
     }
 
     if (confirmingReset) {

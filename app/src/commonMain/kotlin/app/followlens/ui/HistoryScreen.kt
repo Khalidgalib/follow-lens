@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,24 +33,28 @@ data class HistoryEntry(
 
 @Composable
 fun HistoryScreen(entries: List<HistoryEntry>) {
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        item { ScreenHeader("History") }
+    val listState = rememberLazyListState()
+    Row(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 20.dp)) {
+            item { ScreenHeader("History") }
 
-        if (entries.isEmpty()) {
-            item {
-                Text(
-                    "Import your export to start tracking history.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FollowLensColors.textTertiary,
-                    modifier = Modifier.padding(top = 24.dp),
-                )
+            if (entries.isEmpty()) {
+                item {
+                    Text(
+                        "Import your export to start tracking history.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FollowLensColors.textTertiary,
+                        modifier = Modifier.padding(top = 24.dp),
+                    )
+                }
+            }
+
+            items(entries.reversed(), key = { it.takenAtSeconds }) { entry ->
+                HistoryCard(entry)
+                Spacer(Modifier.height(10.dp))
             }
         }
-
-        items(entries.reversed(), key = { it.takenAtSeconds }) { entry ->
-            HistoryCard(entry)
-            Spacer(Modifier.height(10.dp))
-        }
+        ScrollPositionIndicator(listState, Modifier.fillMaxHeight().padding(vertical = 8.dp, horizontal = 4.dp))
     }
 }
 

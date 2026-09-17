@@ -1,5 +1,6 @@
 package app.followlens.ui
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +42,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
 
     var loaded by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<FollowDiffResult?>(null) }
-    var showImport by remember { mutableStateOf(false) }
+    var showUploadPanel by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var screen by remember { mutableStateOf(Screen.DASHBOARD) }
     var version by remember { mutableStateOf(0) }
@@ -58,71 +61,76 @@ fun App(driverFactory: DatabaseDriverFactory) {
         version++
     }
 
+    fun submitImport(following: String, followers: String) {
+        try {
+            repo.import(following, followers)
+            showUploadPanel = false
+            error = null
+            refresh()
+        } catch (e: ExportParser.ParseException) {
+            error = e.message ?: "That doesn't look like a valid Instagram export."
+        }
+    }
+
     MaterialTheme(colorScheme = FollowLensDarkColorScheme, shapes = FollowLensShapes) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            when {
-                !loaded -> Centered { CircularProgressIndicator() }
+        CompositionLocalProvider(LocalIndication provides ripple(color = FollowLensColors.accentStrong)) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    if (!loaded) {
+                        Centered { CircularProgressIndicator() }
+                    } else {
+                        // Dashboard is always the home screen — with no data yet it just shows
+                        // zeros plus the upload panel instead of gating the whole app behind it.
+                        Column(Modifier.fillMaxSize()) {
+                            Column(Modifier.weight(1f)) {
+                                when (screen) {
+                                    Screen.DASHBOARD -> DashboardScreen(
+                                        hasData = result != null,
+                                        followingCount = (result?.mutuals?.size ?: 0) + (result?.notFollowingBack?.size ?: 0),
+                                        followersCount = (result?.mutuals?.size ?: 0) + (result?.fans?.size ?: 0),
+                                        notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
+                                        trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
+                                        trendRangeLabel = history.takeIf { it.size >= 2 }
+                                            ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
+                                        lastImportAtSeconds = history.lastOrNull()?.takenAtSeconds,
+                                        showUploadPanel = showUploadPanel,
+                                        onShowUploadPanel = { showUploadPanel = true },
+                                        onHideUploadPanel = { showUploadPanel = false; error = null },
+                                        importError = error,
+                                        onSubmitImport = ::submitImport,
+                                    )
 
-                result == null || showImport -> ImportScreen(
-                    error = error,
-                    canCancel = result != null,
-                    onCancel = { showImport = false; error = null },
-                    onSubmit = { following, followers ->
-                        try {
-                            repo.import(following, followers)
-                            showImport = false
-                            error = null
-                            refresh()
-                        } catch (e: ExportParser.ParseException) {
-                            error = e.message ?: "That doesn't look like a valid Instagram export."
-                        }
-                    },
-                )
+                                    Screen.NOT_FOLLOWING_BACK -> AccountListScreen(
+                                        title = "Not following back",
+                                        accounts = result?.notFollowingBack ?: emptyList(),
+                                        onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                    )
 
-                else -> Column(Modifier.fillMaxSize()) {
-                    Column(Modifier.weight(1f)) {
-                        when (screen) {
-                            Screen.DASHBOARD -> DashboardScreen(
-                                followingCount = result!!.mutuals.size + result!!.notFollowingBack.size,
-                                followersCount = result!!.mutuals.size + result!!.fans.size,
-                                notFollowingBackCount = result!!.notFollowingBack.size,
-                                trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
-                                trendRangeLabel = history.takeIf { it.size >= 2 }
-                                    ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
-                                lastImportAtSeconds = history.lastOrNull()?.takenAtSeconds,
-                                onReImport = { showImport = true },
-                            )
+                                    Screen.FANS -> AccountListScreen(
+                                        title = "Fans",
+                                        accounts = result?.fans ?: emptyList(),
+                                        onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                    )
 
-                            Screen.NOT_FOLLOWING_BACK -> AccountListScreen(
-                                title = "Not following back",
-                                accounts = result!!.notFollowingBack,
-                                onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
-                            )
+                                    Screen.HISTORY -> HistoryScreen(entries = history)
 
-                            Screen.FANS -> AccountListScreen(
-                                title = "Fans",
-                                accounts = result!!.fans,
-                                onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
-                            )
-
-                            Screen.HISTORY -> HistoryScreen(entries = history)
-
-                            Screen.SETTINGS -> SettingsScreen(
-                                whitelist = whitelist,
-                                onRemoveFromWhitelist = { username -> repo.removeFromWhitelist(username); refresh() },
-                                onClearAllData = {
-                                    repo.clearAllData()
-                                    showImport = true
-                                    result = null
-                                    version++
-                                },
-                            )
+                                    Screen.SETTINGS -> SettingsScreen(
+                                        whitelist = whitelist,
+                                        onRemoveFromWhitelist = { username -> repo.removeFromWhitelist(username); refresh() },
+                                        onClearAllData = {
+                                            repo.clearAllData()
+                                            result = null
+                                            showUploadPanel = false
+                                            screen = Screen.DASHBOARD
+                                            version++
+                                        },
+                                    )
+                                }
+                            }
+                            BottomNavBar(current = screen, onSelect = { screen = it })
                         }
                     }
-                    BottomNavBar(current = screen, onSelect = { screen = it })
                 }
-            }
             }
         }
     }

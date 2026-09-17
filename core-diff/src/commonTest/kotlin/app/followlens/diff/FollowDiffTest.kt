@@ -92,6 +92,16 @@ class FollowDiffTest {
     }
 
     @Test
+    fun detectKind_identifiesJsonFollowingByKey() {
+        assertEquals(ExportParser.ExportKind.FOLLOWING, parser.detectKind(followingJson("alice")))
+    }
+
+    @Test
+    fun detectKind_identifiesJsonFollowersByBareArray() {
+        assertEquals(ExportParser.ExportKind.FOLLOWERS, parser.detectKind(followersJson("alice")))
+    }
+
+    @Test
     fun parser_rejectsEmptyAndCorruptInput() {
         assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("") }
         assertFailsWith<ExportParser.ParseException> { parser.parseFollowing("{ not json") }
