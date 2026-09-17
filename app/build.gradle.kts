@@ -30,6 +30,8 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
+            implementation(libs.filekit.core)
+            implementation(libs.filekit.compose)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

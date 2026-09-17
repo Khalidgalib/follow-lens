@@ -1,5 +1,10 @@
 package app.followlens.diff
 
+import com.fleeksoft.ksoup.Ksoup
+import com.fleeksoft.ksoup.nodes.Element
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -10,7 +15,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * Parses the JSON files from Instagram's "Download your information" export.
+ * Parses the files from Instagram's "Download your information" export — both the JSON and the
+ * HTML format are accepted, auto-detected from content (not file extension).
  *
  * Layout inside the ZIP: `connections/followers_and_following/`
  *   - `followers_1.json` (and `_2`, ...) — a TOP-LEVEL JSON ARRAY of entries
@@ -32,8 +38,16 @@ import kotlinx.serialization.json.longOrNull
  * [collectEntries] tries `value`, then `title`, then parses `href` as a last resort, so both
  * shapes (and any file that mixes them) work.
  *
+ * The HTML export shows the same asymmetry: `following.html` renders each entry as username,
+ * blank line, the `_u/`-prefixed profile URL, then a date (`"Sep 17, 2026 11:21 am"`); the
+ * `followers_N.html` files render only username then date — no visible URL line at all, though
+ * the username is still an `<a href="https://www.instagram.com/USERNAME">` link. [collectHtmlEntries]
+ * doesn't rely on either shape specifically: it selects every anchor linking to instagram.com
+ * anywhere in the document (so it doesn't care which of the two shapes it's looking at) and reads
+ * the username from the `href` attribute, not the visible text or line position.
+ *
  * The caller is responsible for unzipping and locating the files (platform-specific). This class
- * only turns raw JSON text into [Account] sets.
+ * only turns raw export text into [Account] sets.
  */
 class ExportParser {
 
@@ -51,29 +65,42 @@ class ExportParser {
         if (followerFileContents.isEmpty()) throw ParseException("no followers file provided")
         val out = LinkedHashMap<String, Account>()
         followerFileContents.forEachIndexed { i, content ->
-            val root = parseRoot(content, "followers file #${i + 1}")
-            val entries = when (root) {
-                is JsonArray -> root
-                is JsonObject -> root["relationships_followers"]?.jsonArray
-                    ?: throw ParseException("followers file #${i + 1}: object without 'relationships_followers'")
-                else -> throw ParseException("followers file #${i + 1}: unexpected top-level JSON")
+            if (content.isBlank()) throw ParseException("followers file #${i + 1} is empty")
+            if (looksLikeHtml(content)) {
+                collectHtmlEntries(content, out)
+            } else {
+                val root = parseRoot(content, "followers file #${i + 1}")
+                val entries = when (root) {
+                    is JsonArray -> root
+                    is JsonObject -> root["relationships_followers"]?.jsonArray
+                        ?: throw ParseException("followers file #${i + 1}: object without 'relationships_followers'")
+                    else -> throw ParseException("followers file #${i + 1}: unexpected top-level JSON")
+                }
+                collectEntries(entries, out)
             }
-            collectEntries(entries, out)
         }
         return out.values.toSet()
     }
 
-    /** Parse `following.json`. Accepts the standard `relationships_following` wrapper or a bare array. */
+    /**
+     * Parse `following.json` or `following.html`. Accepts the standard `relationships_following`
+     * wrapper, a bare array, or the HTML export.
+     */
     fun parseFollowing(followingFileContent: String): Set<Account> {
-        val root = parseRoot(followingFileContent, "following file")
-        val entries = when (root) {
-            is JsonArray -> root
-            is JsonObject -> root["relationships_following"]?.jsonArray
-                ?: throw ParseException("following file: object without 'relationships_following'")
-            else -> throw ParseException("following file: unexpected top-level JSON")
-        }
+        if (followingFileContent.isBlank()) throw ParseException("following file is empty")
         val out = LinkedHashMap<String, Account>()
-        collectEntries(entries, out)
+        if (looksLikeHtml(followingFileContent)) {
+            collectHtmlEntries(followingFileContent, out)
+        } else {
+            val root = parseRoot(followingFileContent, "following file")
+            val entries = when (root) {
+                is JsonArray -> root
+                is JsonObject -> root["relationships_following"]?.jsonArray
+                    ?: throw ParseException("following file: object without 'relationships_following'")
+                else -> throw ParseException("following file: unexpected top-level JSON")
+            }
+            collectEntries(entries, out)
+        }
         return out.values.toSet()
     }
 
@@ -84,7 +111,6 @@ class ExportParser {
         )
 
     private fun parseRoot(content: String, label: String): JsonElement {
-        if (content.isBlank()) throw ParseException("$label is empty")
         return try {
             json.parseToJsonElement(content)
         } catch (e: Exception) {
@@ -125,4 +151,68 @@ class ExportParser {
 
     private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
         if (isString) content else content.ifBlank { null }
+
+    private fun looksLikeHtml(content: String): Boolean = content.trimStart().startsWith("<")
+
+    /**
+     * Every export entry is an `<a href="https://www.instagram.com/...">` link somewhere in the
+     * document — selecting on that alone (rather than specific div classes, which aren't known and
+     * are the part most likely to change) works for both real shapes: following.html's
+     * username/blank/URL/date and followers_N.html's username/date with no visible URL line.
+     */
+    private fun collectHtmlEntries(content: String, out: MutableMap<String, Account>) {
+        val anchors = Ksoup.parse(html = content).select("a[href*=instagram.com]")
+        if (anchors.isEmpty()) throw ParseException("no instagram.com links found in HTML export")
+        for (anchor in anchors) {
+            val username = usernameFromHref(anchor.attr("href")) ?: continue
+            val account = Account.of(username, timestampNearHtmlAnchor(anchor))
+            if (account.username !in out) out[account.username] = account
+        }
+    }
+
+    /**
+     * Best-effort only: walks up a few ancestors looking for the confirmed real date format
+     * ("Sep 17, 2026 11:21 am") and returns null rather than throwing if none is found, since the
+     * exact markup nesting around each anchor isn't verified beyond the two real samples this was
+     * built against.
+     */
+    private fun timestampNearHtmlAnchor(anchor: Element): Long? {
+        var ancestor: Element? = anchor.parent()
+        repeat(3) {
+            val match = ancestor?.let { htmlDateRegex.find(it.text()) }
+            if (match != null) return parseHtmlDate(match)
+            ancestor = ancestor?.parent()
+        }
+        return null
+    }
+
+    private fun parseHtmlDate(match: MatchResult): Long? {
+        val groups = match.groupValues
+        val monthName = groups[1]
+        val day = groups[2].toInt()
+        val year = groups[3].toInt()
+        val hour12 = groups[4].toInt()
+        val minute = groups[5].toInt()
+        val isPm = groups[6].equals("pm", ignoreCase = true)
+
+        val month = htmlMonthAbbreviations.indexOfFirst { it.equals(monthName, ignoreCase = true) } + 1
+        if (month == 0) return null
+        val hour = when {
+            !isPm && hour12 == 12 -> 0
+            isPm && hour12 != 12 -> hour12 + 12
+            else -> hour12
+        }
+        return try {
+            LocalDateTime(year, month, day, hour, minute).toInstant(TimeZone.UTC).epochSeconds
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private companion object {
+        val htmlDateRegex =
+            Regex("""([A-Za-z]{3}) (\d{1,2}), (\d{4}) (\d{1,2}):(\d{2}) ([ap]m)""", RegexOption.IGNORE_CASE)
+        val htmlMonthAbbreviations =
+            listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    }
 }
