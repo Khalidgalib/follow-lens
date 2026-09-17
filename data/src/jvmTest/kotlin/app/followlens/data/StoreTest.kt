@@ -45,6 +45,20 @@ class StoreTest {
     }
 
     @Test
+    fun history_returnsAllSnapshotsOldestFirst() {
+        val db = freshDb()
+        val s = SnapshotStore(db)
+        s.save(snapshot(listOf("a"), listOf("a")), takenAtSeconds = 200)
+        s.save(snapshot(listOf("b"), listOf("b")), takenAtSeconds = 100)
+
+        val history = s.history()
+        assertEquals(listOf(100L, 200L), history.map { it.takenAtSeconds })
+
+        resetAllData(db)
+        assertEquals(emptyList(), s.history())
+    }
+
+    @Test
     fun whitelist_addAndRemove() {
         val db = freshDb()
         val wl = WhitelistStore(db)

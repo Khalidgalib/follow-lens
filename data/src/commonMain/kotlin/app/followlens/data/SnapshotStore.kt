@@ -31,16 +31,23 @@ class SnapshotStore(private val db: FollowLensDb) {
     /** The most recent import, or null if the user hasn't imported anything yet. */
     fun latest(): StoredSnapshot? {
         val row = q.latestSnapshot().executeAsOneOrNull() ?: return null
-        return StoredSnapshot(
-            id = row.id,
-            takenAtSeconds = row.taken_at_seconds,
-            snapshot = ExportSnapshot(
-                followers = accounts(row.id, ROLE_FOLLOWER),
-                following = accounts(row.id, ROLE_FOLLOWING),
-                exportedAtSeconds = row.exported_at_seconds,
-            ),
-        )
+        return storedSnapshot(row.id, row.taken_at_seconds, row.exported_at_seconds)
     }
+
+    /** Every import, oldest first — powers the dashboard trend and the history screen. */
+    fun history(): List<StoredSnapshot> = q.allSnapshots().executeAsList().map { row ->
+        storedSnapshot(row.id, row.taken_at_seconds, row.exported_at_seconds)
+    }
+
+    private fun storedSnapshot(id: Long, takenAtSeconds: Long, exportedAtSeconds: Long?) = StoredSnapshot(
+        id = id,
+        takenAtSeconds = takenAtSeconds,
+        snapshot = ExportSnapshot(
+            followers = accounts(id, ROLE_FOLLOWER),
+            following = accounts(id, ROLE_FOLLOWING),
+            exportedAtSeconds = exportedAtSeconds,
+        ),
+    )
 
     private fun accounts(snapshotId: Long, role: String): Set<Account> =
         q.accountsForSnapshot(snapshotId, role).executeAsList()

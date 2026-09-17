@@ -45,6 +45,9 @@ VALUES (?, ?, ?, ?);
 latestSnapshot:
 SELECT * FROM snapshot ORDER BY taken_at_seconds DESC LIMIT 1;
 
+allSnapshots:
+SELECT * FROM snapshot ORDER BY taken_at_seconds ASC;
+
 accountsForSnapshot:
 SELECT a.username, sa.since_seconds
 FROM snapshot_account sa JOIN account a ON a.id = sa.account_id
