@@ -1,7 +1,9 @@
 package app.followlens
 
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import app.followlens.data.DatabaseDriverFactory
 import app.followlens.ui.App
@@ -18,6 +20,7 @@ fun main() {
             Window(
                 onCloseRequest = ::exitApplication,
                 title = "FollowLens (desktop dev harness)",
+                state = WindowState(size = DpSize(420.dp, 860.dp)),
             ) {
                 App(DatabaseDriverFactory())
             }
