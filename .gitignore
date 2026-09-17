@@ -12,7 +12,6 @@ local.properties
 # Xcode / iOS
 xcuserdata/
 *.xcworkspace/xcuserdata/
-app/iosApp/build/
 Pods/
 
 # OS

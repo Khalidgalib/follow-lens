@@ -1,7 +1,11 @@
 package app.followlens.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,6 +60,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
 
     MaterialTheme(colorScheme = FollowLensDarkColorScheme, shapes = FollowLensShapes) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             when {
                 !loaded -> Centered { CircularProgressIndicator() }
 
@@ -117,6 +122,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                     }
                     BottomNavBar(current = screen, onSelect = { screen = it })
                 }
+            }
             }
         }
     }
