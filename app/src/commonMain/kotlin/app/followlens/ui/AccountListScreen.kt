@@ -49,7 +49,12 @@ private enum class SortMode(val label: String) {
  * filters both [app.followlens.diff.FollowDiffResult] lists, so both get the same actions.
  */
 @Composable
-fun AccountListScreen(title: String, accounts: List<Account>, onWhitelist: (String) -> Unit) {
+fun AccountListScreen(
+    title: String,
+    accounts: List<Account>,
+    onWhitelist: (String) -> Unit,
+    onBack: (() -> Unit)? = null,
+) {
     var query by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(SortMode.RECENT) }
     val uriHandler = LocalUriHandler.current
@@ -71,7 +76,7 @@ fun AccountListScreen(title: String, accounts: List<Account>, onWhitelist: (Stri
         Row(Modifier.fillMaxSize()) {
             LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 20.dp)) {
                 item {
-                    ScreenHeader("$title · ${accounts.size}")
+                    ScreenHeader("$title · ${accounts.size}", onBack = onBack)
                 }
                 item {
                     Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {

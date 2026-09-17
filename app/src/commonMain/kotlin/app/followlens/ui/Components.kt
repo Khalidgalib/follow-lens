@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,23 +39,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.followlens.diff.Account
 
-/** Small brand mark + screen title, echoed at the top of every tab (matches the app icon). */
+/**
+ * Small brand mark + screen title, echoed at the top of every tab (matches the app icon). Pass
+ * [onBack] to turn the brand mark into a back arrow instead — used by drill-down screens that
+ * aren't reachable from the bottom nav (e.g. the Following/Followers lists off the Dashboard).
+ */
 @Composable
-fun ScreenHeader(title: String, modifier: Modifier = Modifier) {
+fun ScreenHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null) {
     Row(modifier.padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = FollowLensColors.accentStrong, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
+        if (onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = FollowLensColors.accentStrong)
+            }
+            Spacer(Modifier.width(4.dp))
+        } else {
+            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = FollowLensColors.accentStrong, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+        }
         Text(title, style = MaterialTheme.typography.headlineSmall, color = FollowLensColors.accentStrong, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
-fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, highlight: Boolean = false) {
-    Surface(
-        modifier = modifier,
-        color = FollowLensColors.surfaceRaised,
-        shape = RoundedCornerShape(12.dp),
-    ) {
+fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, highlight: Boolean = false, onClick: (() -> Unit)? = null) {
+    val content: @Composable () -> Unit = {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 11.dp)) {
             Text(
                 label,
@@ -68,6 +77,22 @@ fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, highlight
                 color = if (highlight) FollowLensColors.accentStrong else FollowLensColors.textPrimary,
             )
         }
+    }
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            color = FollowLensColors.surfaceRaised,
+            shape = RoundedCornerShape(12.dp),
+            content = content,
+        )
+    } else {
+        Surface(
+            modifier = modifier,
+            color = FollowLensColors.surfaceRaised,
+            shape = RoundedCornerShape(12.dp),
+            content = content,
+        )
     }
 }
 

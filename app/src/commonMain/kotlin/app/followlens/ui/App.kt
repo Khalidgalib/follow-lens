@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import kotlinx.datetime.Clock
  * Instagram export, we run [FollowDiff] and show who doesn't follow them back. Each import is
  * saved as a snapshot so the Dashboard trend and History tab work across imports.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(driverFactory: DatabaseDriverFactory) {
     val repo = remember { FollowLensRepo(driverFactory) }
@@ -45,6 +49,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
     var showUploadPanel by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var screen by remember { mutableStateOf(Screen.DASHBOARD) }
+    var detailScreen by remember { mutableStateOf<DetailScreen?>(null) }
     var version by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
@@ -73,7 +78,10 @@ fun App(driverFactory: DatabaseDriverFactory) {
     }
 
     MaterialTheme(colorScheme = FollowLensDarkColorScheme, shapes = FollowLensShapes) {
-        CompositionLocalProvider(LocalIndication provides ripple(color = FollowLensColors.accentStrong)) {
+        CompositionLocalProvider(
+            LocalIndication provides ripple(color = FollowLensColors.accentStrong),
+            LocalRippleConfiguration provides RippleConfiguration(color = FollowLensColors.accentStrong),
+        ) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                     if (!loaded) {
@@ -83,51 +91,70 @@ fun App(driverFactory: DatabaseDriverFactory) {
                         // zeros plus the upload panel instead of gating the whole app behind it.
                         Column(Modifier.fillMaxSize()) {
                             Column(Modifier.weight(1f)) {
-                                when (screen) {
-                                    Screen.DASHBOARD -> DashboardScreen(
-                                        hasData = result != null,
-                                        followingCount = (result?.mutuals?.size ?: 0) + (result?.notFollowingBack?.size ?: 0),
-                                        followersCount = (result?.mutuals?.size ?: 0) + (result?.fans?.size ?: 0),
-                                        notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
-                                        trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
-                                        trendRangeLabel = history.takeIf { it.size >= 2 }
-                                            ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
-                                        lastImportAtSeconds = history.lastOrNull()?.takenAtSeconds,
-                                        showUploadPanel = showUploadPanel,
-                                        onShowUploadPanel = { showUploadPanel = true },
-                                        onHideUploadPanel = { showUploadPanel = false; error = null },
-                                        importError = error,
-                                        onSubmitImport = ::submitImport,
-                                    )
-
-                                    Screen.NOT_FOLLOWING_BACK -> AccountListScreen(
-                                        title = "Not following back",
-                                        accounts = result?.notFollowingBack ?: emptyList(),
+                                when (val detail = detailScreen) {
+                                    DetailScreen.FOLLOWING -> AccountListScreen(
+                                        title = "Following",
+                                        accounts = (result?.mutuals ?: emptyList()) + (result?.notFollowingBack ?: emptyList()),
                                         onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                        onBack = { detailScreen = null },
                                     )
 
-                                    Screen.FANS -> AccountListScreen(
-                                        title = "Fans",
-                                        accounts = result?.fans ?: emptyList(),
+                                    DetailScreen.FOLLOWERS -> AccountListScreen(
+                                        title = "Followers",
+                                        accounts = (result?.mutuals ?: emptyList()) + (result?.fans ?: emptyList()),
                                         onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                        onBack = { detailScreen = null },
                                     )
 
-                                    Screen.HISTORY -> HistoryScreen(entries = history)
+                                    null -> when (screen) {
+                                        Screen.DASHBOARD -> DashboardScreen(
+                                            hasData = result != null,
+                                            followingCount = (result?.mutuals?.size ?: 0) + (result?.notFollowingBack?.size ?: 0),
+                                            followersCount = (result?.mutuals?.size ?: 0) + (result?.fans?.size ?: 0),
+                                            notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
+                                            trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
+                                            trendRangeLabel = history.takeIf { it.size >= 2 }
+                                                ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
+                                            lastImportAtSeconds = history.lastOrNull()?.takenAtSeconds,
+                                            showUploadPanel = showUploadPanel,
+                                            onShowUploadPanel = { showUploadPanel = true },
+                                            onHideUploadPanel = { showUploadPanel = false; error = null },
+                                            importError = error,
+                                            onSubmitImport = ::submitImport,
+                                            onOpenFollowing = { detailScreen = DetailScreen.FOLLOWING },
+                                            onOpenFollowers = { detailScreen = DetailScreen.FOLLOWERS },
+                                            onOpenNotFollowingBack = { screen = Screen.NOT_FOLLOWING_BACK },
+                                        )
 
-                                    Screen.SETTINGS -> SettingsScreen(
-                                        whitelist = whitelist,
-                                        onRemoveFromWhitelist = { username -> repo.removeFromWhitelist(username); refresh() },
-                                        onClearAllData = {
-                                            repo.clearAllData()
-                                            result = null
-                                            showUploadPanel = false
-                                            screen = Screen.DASHBOARD
-                                            version++
-                                        },
-                                    )
+                                        Screen.NOT_FOLLOWING_BACK -> AccountListScreen(
+                                            title = "Not following back",
+                                            accounts = result?.notFollowingBack ?: emptyList(),
+                                            onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                        )
+
+                                        Screen.FANS -> AccountListScreen(
+                                            title = "Fans",
+                                            accounts = result?.fans ?: emptyList(),
+                                            onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                        )
+
+                                        Screen.HISTORY -> HistoryScreen(entries = history)
+
+                                        Screen.SETTINGS -> SettingsScreen(
+                                            whitelist = whitelist,
+                                            onRemoveFromWhitelist = { username -> repo.removeFromWhitelist(username); refresh() },
+                                            onClearAllData = {
+                                                repo.clearAllData()
+                                                result = null
+                                                showUploadPanel = false
+                                                screen = Screen.DASHBOARD
+                                                version++
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                            BottomNavBar(current = screen, onSelect = { screen = it })
+                            BottomNavBar(current = screen, onSelect = { screen = it; detailScreen = null })
                         }
                     }
                 }
@@ -135,6 +162,8 @@ fun App(driverFactory: DatabaseDriverFactory) {
         }
     }
 }
+
+private enum class DetailScreen { FOLLOWING, FOLLOWERS }
 
 // --- glue: repository over the :data + :core-diff modules --------------------------------------
 

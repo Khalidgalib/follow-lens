@@ -43,6 +43,9 @@ fun DashboardScreen(
     onHideUploadPanel: () -> Unit,
     importError: String?,
     onSubmitImport: (following: String, followers: String) -> Unit,
+    onOpenFollowing: () -> Unit,
+    onOpenFollowers: () -> Unit,
+    onOpenNotFollowingBack: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     Row(Modifier.fillMaxSize()) {
@@ -51,9 +54,9 @@ fun DashboardScreen(
             Spacer(Modifier.height(16.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("FOLLOWING", followingCount, Modifier.weight(1f))
-                StatTile("FOLLOWERS", followersCount, Modifier.weight(1f))
-                StatTile("NOT BACK", notFollowingBackCount, Modifier.weight(1f), highlight = true)
+                StatTile("FOLLOWING", followingCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowing else null)
+                StatTile("FOLLOWERS", followersCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowers else null)
+                StatTile("NOT BACK", notFollowingBackCount, Modifier.weight(1f), highlight = true, onClick = if (hasData) onOpenNotFollowingBack else null)
             }
 
             Spacer(Modifier.height(14.dp))
