@@ -11,11 +11,21 @@ import app.followlens.ui.App
  * without an emulator. Not a shipping target (v1 is iOS + Android). The JVM SQLite driver is
  * in-memory, so snapshots don't persist between runs here.
  */
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "FollowLens (desktop dev harness)",
-    ) {
-        App(DatabaseDriverFactory())
+fun main() {
+    println("[FollowLens] main() start; headless=" + System.getProperty("java.awt.headless"))
+    try {
+        application {
+            Window(
+                onCloseRequest = ::exitApplication,
+                title = "FollowLens (desktop dev harness)",
+            ) {
+                App(DatabaseDriverFactory())
+            }
+        }
+        println("[FollowLens] application{} returned normally")
+    } catch (t: Throwable) {
+        println("[FollowLens] application{} threw:")
+        t.printStackTrace()
+        throw t
     }
 }
