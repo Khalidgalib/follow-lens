@@ -1,5 +1,7 @@
 package app.followlens.data
 
+import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import app.followlens.data.db.FollowLensDb
 import app.followlens.diff.Account
 import app.followlens.diff.ExportSnapshot
 import kotlin.test.Test
@@ -98,5 +100,25 @@ class StoreTest {
 
         assertEquals(emptySet(), wl.all())
         assertEquals(setOf("alice"), dismissed.all())
+    }
+
+    /**
+     * Reproduces a real bug: a device that already has a database (any pre-existing install, on
+     * any platform) only gets a newly added table via a SQLDelight migration file (`*.sqm`) — the
+     * `.sq` file's CREATE TABLE alone only applies to a database created from scratch. Without the
+     * `1.sqm` migration, every [DismissedStore] query on an upgraded device fails with
+     * "no such table: dismissed_not_follower".
+     */
+    @Test
+    fun schema_migrationAddsDismissedTable_toPreExistingDatabase() {
+        val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        // Minimal stand-in for a pre-migration (version 1) database: just enough for
+        // DismissedStore's queries (which join account) to be meaningful.
+        driver.execute(null, "CREATE TABLE account (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE)", 0)
+        driver.execute(null, "PRAGMA user_version = 1", 0)
+
+        FollowLensDb.Schema.migrate(driver, oldVersion = 1, newVersion = FollowLensDb.Schema.version)
+
+        assertEquals(emptySet(), DismissedStore(FollowLensDb(driver)).all())
     }
 }

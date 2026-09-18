@@ -1,0 +1,9 @@
+-- Migration to schema version 2: adds the "mark handled" feature's table.
+-- SQLDelight only runs FollowLens.sq's CREATE TABLE statements once, when a device's database
+-- file is first created — a device that already has a database (any existing install, on any
+-- platform) needs this migration file to get the new table, or every query against it fails with
+-- "no such table: dismissed_not_follower".
+CREATE TABLE dismissed_not_follower (
+    account_id   INTEGER NOT NULL PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+    dismissed_at_seconds INTEGER NOT NULL
+);
