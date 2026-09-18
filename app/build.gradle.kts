@@ -10,6 +10,11 @@ plugins {
 kotlin {
     jvmToolchain(21)
 
+    // DirectoryLister is an expect/actual class (still Beta in Kotlin 2.1); opt in quietly.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     androidTarget()
     listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework {
@@ -35,6 +40,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.documentfile)
         }
         val desktopMain by getting
         desktopMain.dependencies {

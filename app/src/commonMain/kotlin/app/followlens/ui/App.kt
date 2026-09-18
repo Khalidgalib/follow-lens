@@ -42,7 +42,7 @@ import kotlinx.datetime.Clock
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App(driverFactory: DatabaseDriverFactory) {
+fun App(driverFactory: DatabaseDriverFactory, directoryLister: DirectoryLister) {
     val repo = remember { FollowLensRepo(driverFactory) }
 
     var loaded by remember { mutableStateOf(false) }
@@ -116,6 +116,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                             notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
                                             fansCount = result?.fans?.size ?: 0,
                                             possiblyLimitedRange = result?.possiblyLimitedRange ?: false,
+                                            directoryLister = directoryLister,
                                             trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
                                             trendRangeLabel = history.takeIf { it.size >= 2 }
                                                 ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },

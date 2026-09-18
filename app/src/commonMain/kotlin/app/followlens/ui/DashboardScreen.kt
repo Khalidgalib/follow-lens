@@ -45,6 +45,7 @@ fun DashboardScreen(
     notFollowingBackCount: Int,
     fansCount: Int,
     possiblyLimitedRange: Boolean,
+    directoryLister: DirectoryLister,
     trend: List<TrendPoint>,
     trendRangeLabel: String?,
     lastImportAtSeconds: Long?,
@@ -79,7 +80,7 @@ fun DashboardScreen(
             Spacer(Modifier.height(14.dp))
 
             if (!hasData) {
-                GetStartedCard(error = importError, onSubmit = onSubmitImport)
+                GetStartedCard(error = importError, directoryLister = directoryLister, onSubmit = onSubmitImport)
                 return@Column
             }
 
@@ -147,7 +148,7 @@ fun DashboardScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text("Update data", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(10.dp))
-                        UploadPanel(error = importError, canCancel = true, onCancel = onHideUploadPanel, onSubmit = onSubmitImport)
+                        UploadPanel(error = importError, canCancel = true, onCancel = onHideUploadPanel, directoryLister = directoryLister, onSubmit = onSubmitImport)
                     }
                 }
             } else {
@@ -174,12 +175,12 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun GetStartedCard(error: String?, onSubmit: (following: String, followers: List<String>) -> Unit) {
+private fun GetStartedCard(error: String?, directoryLister: DirectoryLister, onSubmit: (following: String, followers: List<String>) -> Unit) {
     Surface(color = FollowLensColors.surfaceRaised, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text("Get started", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = FollowLensColors.accentStrong)
             Spacer(Modifier.height(12.dp))
-            UploadPanel(error = error, canCancel = false, onCancel = {}, onSubmit = onSubmit)
+            UploadPanel(error = error, canCancel = false, onCancel = {}, directoryLister = directoryLister, onSubmit = onSubmit)
         }
     }
 }

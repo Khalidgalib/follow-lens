@@ -4,6 +4,7 @@ kotlinx-serialization = "1.7.3"
 kotlinx-datetime = "0.6.1"
 kotlinx-coroutines = "1.9.0"
 androidx-activity-compose = "1.9.3"
+androidx-documentfile = "1.0.1"
 agp = "8.13.2"
 android-compileSdk = "35"
 android-minSdk = "26"
@@ -11,6 +12,11 @@ compose-multiplatform = "1.7.3"
 sqldelight = "2.0.2"
 filekit = "0.8.8"
 ksoup = "0.2.4"
+# Pinned to the first release with Kotlin/Native zip support (added in 3.9.0), and released
+# before this project's Kotlin version existed — newer Okio releases risk the same "compiled
+# with an incompatible version of Kotlin" problem already hit with ksoup/FileKit (see the
+# dependency-pin notes in CLAUDE.md).
+okio = "3.9.1"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
@@ -22,9 +28,12 @@ sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", ver
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "androidx-documentfile" }
 filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit" }
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekit" }
 ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+okio-fakefilesystem = { module = "com.squareup.okio:okio-fakefilesystem", version.ref = "okio" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

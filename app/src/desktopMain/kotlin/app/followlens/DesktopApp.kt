@@ -7,6 +7,7 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import app.followlens.data.DatabaseDriverFactory
 import app.followlens.ui.App
+import app.followlens.ui.DirectoryLister
 
 /**
  * Desktop entry point — a dev harness so the shared [App] composable can be run on this machine
@@ -22,7 +23,7 @@ fun main() {
                 title = "FollowLens (desktop dev harness)",
                 state = WindowState(size = DpSize(420.dp, 860.dp)),
             ) {
-                App(DatabaseDriverFactory())
+                App(DatabaseDriverFactory(), DirectoryLister())
             }
         }
         println("[FollowLens] application{} returned normally")

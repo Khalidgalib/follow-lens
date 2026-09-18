@@ -18,6 +18,11 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.ksoup)
+            implementation(libs.okio)
+            // FakeFileSystem gives us an in-memory filesystem to hand a zip's raw bytes to
+            // Okio's openZip() without needing a real platform file path — used in production
+            // (ZipImport), not just tests.
+            implementation(libs.okio.fakefilesystem)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

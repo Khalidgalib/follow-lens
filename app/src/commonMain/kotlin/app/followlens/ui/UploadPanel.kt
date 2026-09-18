@@ -29,13 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.followlens.diff.ExportParser
+import app.followlens.diff.ZipImport
+import io.github.vinceglb.filekit.compose.rememberDirectoryPickerLauncher
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
+import io.github.vinceglb.filekit.core.PlatformDirectory
 import io.github.vinceglb.filekit.core.PlatformFile
+import io.github.vinceglb.filekit.core.extension
 import kotlinx.coroutines.launch
 
-private val importableExtensions = listOf("json", "html", "htm")
+private val importableExtensions = listOf("json", "html", "htm", "zip")
 
 private data class PickedFile(val name: String, val content: String, val kind: ExportParser.ExportKind)
 
@@ -54,6 +58,7 @@ fun UploadPanel(
     error: String?,
     canCancel: Boolean,
     onCancel: () -> Unit,
+    directoryLister: DirectoryLister,
     onSubmit: (following: String, followers: List<String>) -> Unit,
 ) {
     var pickedFiles by remember { mutableStateOf<List<PickedFile>>(emptyList()) }
@@ -66,16 +71,39 @@ fun UploadPanel(
         pickedFiles = pickedFiles.map { if (it.name == name) it.copy(kind = kind) else it }
     }
 
+    fun toPickedFiles(candidates: List<Pair<String, String>>): List<PickedFile> =
+        candidates.map { (name, content) -> PickedFile(name, content, parser.detectKind(content)) }
+
     fun handlePicked(files: List<PlatformFile>) {
         scope.launch {
             try {
-                pickedFiles = files.map { file ->
-                    val content = file.readBytes().decodeToString()
-                    PickedFile(file.name, content, parser.detectKind(content))
+                pickedFiles = files.flatMap { file ->
+                    if (file.extension.lowercase() == "zip") {
+                        toPickedFiles(ZipImport.extractCandidateFiles(file.readBytes()))
+                    } else {
+                        toPickedFiles(listOf(file.name to file.readBytes().decodeToString()))
+                    }
                 }
                 readError = null
             } catch (e: Exception) {
                 readError = "Couldn't read one of the files: ${e.message}"
+            }
+        }
+    }
+
+    fun handlePickedDirectory(directory: PlatformDirectory?) {
+        if (directory == null) return
+        scope.launch {
+            try {
+                val candidates = directoryLister.listCandidateFiles(directory)
+                if (candidates.isEmpty()) {
+                    readError = "No .json/.html export files found in that folder."
+                } else {
+                    pickedFiles = toPickedFiles(candidates)
+                    readError = null
+                }
+            } catch (e: Exception) {
+                readError = "Couldn't read that folder: ${e.message}"
             }
         }
     }
@@ -85,6 +113,9 @@ fun UploadPanel(
         mode = PickerMode.Multiple(),
         onResult = { files -> if (files != null) handlePicked(files) },
     )
+    val directoryLauncher = rememberDirectoryPickerLauncher(
+        onResult = { directory -> handlePickedDirectory(directory) },
+    )
 
     val followingFile = pickedFiles.firstOrNull { it.kind == ExportParser.ExportKind.FOLLOWING }
     val followersFiles = pickedFiles.filter { it.kind == ExportParser.ExportKind.FOLLOWERS }
@@ -93,14 +124,20 @@ fun UploadPanel(
         ImportInstructions()
 
         if (pickedFiles.isEmpty()) {
-            Button(onClick = { launcher.launch() }) { Text("Pick your export files") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { launcher.launch() }) { Text("Pick files or a .zip") }
+                OutlinedButton(onClick = { directoryLauncher.launch() }) { Text("Pick a folder") }
+            }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 pickedFiles.forEach { file ->
                     PickedFileRow(file = file, onSetKind = { kind -> setKind(file.name, kind) })
                 }
             }
-            OutlinedButton(onClick = { launcher.launch() }) { Text("Change files") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { launcher.launch() }) { Text("Change files") }
+                OutlinedButton(onClick = { directoryLauncher.launch() }) { Text("Pick a folder") }
+            }
         }
 
         val shownError = error ?: readError
@@ -178,7 +215,9 @@ private fun ImportInstructions() {
                 "5. Format: JSON (or HTML — both work). Date range: All time.\n" +
                 "6. Submit the request. After a few minutes, go back to this same Download your " +
                 "information section in Instagram and download it directly from there — no need " +
-                "to wait for the email, though Instagram sends one too if you'd rather use that.",
+                "to wait for the email, though Instagram sends one too if you'd rather use that.\n" +
+                "7. Below, pick the .zip file Instagram gave you directly — no need to unzip it " +
+                "yourself first. (If you already unzipped it, \"Pick a folder\" also works.)",
             style = MaterialTheme.typography.bodySmall,
             color = FollowLensColors.textSecondary,
         )
