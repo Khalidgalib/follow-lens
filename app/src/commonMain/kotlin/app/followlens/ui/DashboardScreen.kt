@@ -35,6 +35,7 @@ fun DashboardScreen(
     followingCount: Int,
     followersCount: Int,
     notFollowingBackCount: Int,
+    fansCount: Int,
     trend: List<TrendPoint>,
     trendRangeLabel: String?,
     lastImportAtSeconds: Long?,
@@ -46,6 +47,7 @@ fun DashboardScreen(
     onOpenFollowing: () -> Unit,
     onOpenFollowers: () -> Unit,
     onOpenNotFollowingBack: () -> Unit,
+    onOpenFans: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     Row(Modifier.fillMaxSize()) {
@@ -53,10 +55,15 @@ fun DashboardScreen(
             ScreenHeader("Dashboard")
             Spacer(Modifier.height(16.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("FOLLOWING", followingCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowing else null)
-                StatTile("FOLLOWERS", followersCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowers else null)
-                StatTile("NOT BACK", notFollowingBackCount, Modifier.weight(1f), highlight = true, onClick = if (hasData) onOpenNotFollowingBack else null)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile("FOLLOWING", followingCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowing else null)
+                    StatTile("FOLLOWERS", followersCount, Modifier.weight(1f), onClick = if (hasData) onOpenFollowers else null)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile("NOT BACK", notFollowingBackCount, Modifier.weight(1f), highlight = true, onClick = if (hasData) onOpenNotFollowingBack else null)
+                    StatTile("FANS", fansCount, Modifier.weight(1f), onClick = if (hasData) onOpenFans else null)
+                }
             }
 
             Spacer(Modifier.height(14.dp))

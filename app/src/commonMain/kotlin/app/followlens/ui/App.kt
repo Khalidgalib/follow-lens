@@ -112,6 +112,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                             followingCount = (result?.mutuals?.size ?: 0) + (result?.notFollowingBack?.size ?: 0),
                                             followersCount = (result?.mutuals?.size ?: 0) + (result?.fans?.size ?: 0),
                                             notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
+                                            fansCount = result?.fans?.size ?: 0,
                                             trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
                                             trendRangeLabel = history.takeIf { it.size >= 2 }
                                                 ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
@@ -124,6 +125,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                             onOpenFollowing = { detailScreen = DetailScreen.FOLLOWING },
                                             onOpenFollowers = { detailScreen = DetailScreen.FOLLOWERS },
                                             onOpenNotFollowingBack = { screen = Screen.NOT_FOLLOWING_BACK },
+                                            onOpenFans = { screen = Screen.FANS },
                                         )
 
                                         Screen.NOT_FOLLOWING_BACK -> AccountListScreen(
