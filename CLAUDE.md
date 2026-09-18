@@ -118,20 +118,47 @@ Core algorithm: `notFollowingBack = following − followers` (case-insensitive),
   bump the project's Kotlin version first and re-verify the whole toolchain (this project has a
   history of toolchain fragility — see git log around the AGP/JDK-21 fix-forward).
 
-## Session handoff (2026-09-18, later) — delete this section once it's stale
+## Session handoff (2026-09-18, final) — delete this section once it's stale
 
-Since the earlier handoff (file-upload import, commit `e44bdd7`), landed on
-`feat/v1-build-fixes-and-import-ui`: profile-link icon now opens the web (with a snackbar fallback
-instead of silently doing nothing); theme-wide button ripple via `LocalIndication` +
-`LocalRippleConfiguration` (Material3 components ignore plain `LocalIndication` — both are needed);
-a cross-platform `ScrollPositionIndicator` on all five tabs; Dashboard is now the permanent home
-screen with the upload panel embedded inline instead of gating the whole app behind a separate
-import screen; `ExportParser.detectKind` flags a file dropped in the wrong upload slot (fixed once
-already — its real-HTML-header check initially didn't match the actual export format, see the export
-section above); Dashboard's stat tiles are clickable (Following/Followers open new drill-down
-`AccountListScreen`s with a back button, Not Back jumps to the existing LIST tab, Fans is a new
-fourth tile); and the Galivo brand mark now sits in `ScreenHeader` (see Brand section above). All
-committed; `:core-diff:jvmTest` passes; all three targets (desktop/iOS-sim/Android) compile clean.
+Everything below is committed on `feat/v1-build-fixes-and-import-ui`, working tree clean, HEAD at
+`0afefc3`. Since the file-upload-import handoff (commit `e44bdd7`), in order:
+
+- Profile-link icon opens the web (snackbar fallback instead of silently doing nothing).
+- Theme-wide button ripple via `LocalIndication` **+** `LocalRippleConfiguration` together —
+  Material3 components (`Button`/`IconButton`/`Surface`'s clickable) ignore plain `LocalIndication`
+  and build their own ripple from `LocalRippleConfiguration`; only `selectable`/other plain-Foundation
+  widgets read `LocalIndication`. Needed both to cover every button in the app.
+- A cross-platform `ScrollPositionIndicator` (custom-drawn, not the desktop-only
+  `VerticalScrollbar`) on all five tabs.
+- Dashboard is the permanent home screen — no more separate full-screen import gate. With no data
+  it shows zeros + an inline "Get started" `UploadPanel` (in `UploadPanel.kt`, formerly
+  `ImportScreen.kt`); with data, a "Last import" card with an "Update data" button reveals the same
+  panel inline for re-import.
+- `ExportParser.detectKind` flags a file dropped in the wrong upload slot (Following file in the
+  Followers slot, etc.) — fixed once already, since its real-HTML-header check initially didn't
+  match the actual export format (see the export-format section above).
+- Dashboard's stat tiles are clickable: Following/Followers open new drill-down `AccountListScreen`s
+  with a back button (returns to Dashboard), Not Back jumps to the existing LIST tab, Fans is a
+  fourth tile added this session that jumps to the existing FANS tab.
+- The Galivo brand mark sits in `ScreenHeader` in a vivid gold with a soft glow (see Brand section
+  above) — `FollowLensColors.accent`/`accentStrong` were also brightened app-wide in the same pass.
+
+`:core-diff:jvmTest` passes; all three targets (desktop/iOS-sim/Android) compile clean.
+
+**App-distribution logistics explored this session** (no code involved, just process — worth keeping
+so it isn't re-discovered from scratch): to let friends sideload-test the Android build outside the
+Play Store, `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` is enough
+(debug signing is fine for this, unrelated to a future release signing key). Two real gotchas hit
+while sharing that file:
+- **Google Drive refuses to generate a share link for a raw `.apk`** ("Sorry, sharing is unavailable
+  at this time") — a blanket executable-file restriction, not specific to this file. Fix: zip it
+  first: Drive can't see the extension inside a zip.
+- **WhatsApp's in-app browser can't download zip/apk files opened by tapping a link inside a
+  chat** — hangs silently on Android, shows "unsupported file" on iPhone — even though the same link
+  works fine in a real browser or another app's in-app browser (confirmed via Instagram). The link
+  itself is fine; tell recipients to long-press the link → "Open in Safari/Chrome" rather than
+  tapping it directly. WeTransfer's dedicated download page avoids this problem entirely and doesn't
+  need the zip step — use that instead if this comes up again.
 
 **Not yet done**: the real app icon (iOS `AppIcon` catalog / Android adaptive icon) using the Galivo
 mark — deliberately deferred as separate, bigger work with its own platform safe-zone rules.
