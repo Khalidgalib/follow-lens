@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.followlens.data.DatabaseDriverFactory
+import app.followlens.data.DismissedStore
 import app.followlens.data.SnapshotStore
 import app.followlens.data.StoredSnapshot
 import app.followlens.data.WhitelistStore
@@ -60,13 +61,14 @@ fun App(driverFactory: DatabaseDriverFactory) {
 
     val history = remember(version) { repo.history() }
     val whitelist = remember(version) { repo.whitelistUsernames() }
+    val handled = remember(version) { repo.dismissedUsernames() }
 
     fun refresh() {
         result = repo.diff()
         version++
     }
 
-    fun submitImport(following: String, followers: String) {
+    fun submitImport(following: String, followers: List<String>) {
         try {
             repo.import(following, followers)
             showUploadPanel = false
@@ -113,6 +115,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                             followersCount = (result?.mutuals?.size ?: 0) + (result?.fans?.size ?: 0),
                                             notFollowingBackCount = result?.notFollowingBack?.size ?: 0,
                                             fansCount = result?.fans?.size ?: 0,
+                                            possiblyLimitedRange = result?.possiblyLimitedRange ?: false,
                                             trend = history.map { TrendPoint(it.followingCount, it.followersCount) },
                                             trendRangeLabel = history.takeIf { it.size >= 2 }
                                                 ?.let { formatMonthRange(it.first().takenAtSeconds, it.last().takenAtSeconds) },
@@ -132,6 +135,7 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                             title = "Not following back",
                                             accounts = result?.notFollowingBack ?: emptyList(),
                                             onWhitelist = { username -> repo.addToWhitelist(username); refresh() },
+                                            onMarkHandled = { username -> repo.markHandled(username); refresh() },
                                         )
 
                                         Screen.FANS -> AccountListScreen(
@@ -145,6 +149,8 @@ fun App(driverFactory: DatabaseDriverFactory) {
                                         Screen.SETTINGS -> SettingsScreen(
                                             whitelist = whitelist,
                                             onRemoveFromWhitelist = { username -> repo.removeFromWhitelist(username); refresh() },
+                                            handled = handled,
+                                            onUnmarkHandled = { username -> repo.unmarkHandled(username); refresh() },
                                             onClearAllData = {
                                                 repo.clearAllData()
                                                 result = null
@@ -173,6 +179,7 @@ private class FollowLensRepo(driverFactory: DatabaseDriverFactory) {
     private val db = openDatabase(driverFactory)
     private val snapshots = SnapshotStore(db)
     private val whitelist = WhitelistStore(db)
+    private val dismissed = DismissedStore(db)
     private val parser = ExportParser()
 
     private var current: ExportSnapshot? = null
@@ -182,8 +189,8 @@ private class FollowLensRepo(driverFactory: DatabaseDriverFactory) {
     }
 
     /** @throws ExportParser.ParseException on bad input. */
-    fun import(followingJson: String, followersJson: String) {
-        val snapshot = parser.parseSnapshot(followingJson, followersJson)
+    fun import(followingJson: String, followersJson: List<String>) {
+        val snapshot = parser.parseSnapshot(followingJson, *followersJson.toTypedArray())
         snapshots.save(snapshot, Clock.System.now().epochSeconds)
         current = snapshot
     }
@@ -198,23 +205,34 @@ private class FollowLensRepo(driverFactory: DatabaseDriverFactory) {
 
     fun whitelistUsernames(): List<String> = whitelist.all().sorted()
 
+    fun markHandled(username: String) {
+        dismissed.add(username, Clock.System.now().epochSeconds)
+    }
+
+    fun unmarkHandled(username: String) {
+        dismissed.remove(username)
+    }
+
+    fun dismissedUsernames(): List<String> = dismissed.all().sorted()
+
     fun clearAllData() {
         resetAllData(db)
         current = null
     }
 
-    fun diff(): FollowDiffResult? = current?.let { FollowDiff.compare(it, whitelist.all()) }
+    fun diff(): FollowDiffResult? = current?.let { FollowDiff.compare(it, whitelist.all(), dismissed.all()) }
 
     /** Oldest-first, one entry per import, each carrying its change since the previous one. */
     fun history(): List<HistoryEntry> {
         val stored: List<StoredSnapshot> = snapshots.history()
         val wl = whitelist.all()
+        val dismissedNames = dismissed.all()
         return stored.mapIndexed { i, s ->
             HistoryEntry(
                 takenAtSeconds = s.takenAtSeconds,
                 followingCount = s.snapshot.following.size,
                 followersCount = s.snapshot.followers.size,
-                notFollowingBackCount = FollowDiff.compare(s.snapshot, wl).notFollowingBack.size,
+                notFollowingBackCount = FollowDiff.compare(s.snapshot, wl, dismissedNames).notFollowingBack.size,
                 delta = if (i == 0) null else FollowDiff.delta(stored[i - 1].snapshot, s.snapshot),
             )
         }

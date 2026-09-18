@@ -24,6 +24,15 @@ CREATE TABLE whitelist (
     added_at_seconds INTEGER NOT NULL
 );
 
+-- Accounts the user has marked "handled" on the not-following-back list (e.g. they already
+-- unfollowed them in Instagram, but a fresh export hasn't confirmed it yet). Distinct from
+-- whitelist: whitelist means "never flag this account", handled means "I already acted on this
+-- specific flag, hide it until I say otherwise."
+CREATE TABLE dismissed_not_follower (
+    account_id   INTEGER NOT NULL PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+    dismissed_at_seconds INTEGER NOT NULL
+);
+
 -- --- queries ---
 
 insertSnapshot:
@@ -62,6 +71,15 @@ INSERT OR IGNORE INTO whitelist(account_id, added_at_seconds) VALUES (?, ?);
 removeFromWhitelist:
 DELETE FROM whitelist WHERE account_id = ?;
 
+allDismissedUsernames:
+SELECT a.username FROM dismissed_not_follower d JOIN account a ON a.id = d.account_id;
+
+addDismissed:
+INSERT OR IGNORE INTO dismissed_not_follower(account_id, dismissed_at_seconds) VALUES (?, ?);
+
+removeDismissed:
+DELETE FROM dismissed_not_follower WHERE account_id = ?;
+
 -- Wipe everything (privacy "reset"). Deleted table-by-table rather than relying on
 -- ON DELETE CASCADE: SQLite only enforces foreign keys when PRAGMA foreign_keys=ON
 -- (SQLDelight drivers don't set it by default), and whitelist/account aren't children
@@ -69,6 +87,7 @@ DELETE FROM whitelist WHERE account_id = ?;
 clearAllData {
     DELETE FROM snapshot_account;
     DELETE FROM whitelist;
+    DELETE FROM dismissed_not_follower;
     DELETE FROM snapshot;
     DELETE FROM account;
 }

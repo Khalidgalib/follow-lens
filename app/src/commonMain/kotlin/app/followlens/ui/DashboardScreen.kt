@@ -17,11 +17,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +44,7 @@ fun DashboardScreen(
     followersCount: Int,
     notFollowingBackCount: Int,
     fansCount: Int,
+    possiblyLimitedRange: Boolean,
     trend: List<TrendPoint>,
     trendRangeLabel: String?,
     lastImportAtSeconds: Long?,
@@ -43,13 +52,14 @@ fun DashboardScreen(
     onShowUploadPanel: () -> Unit,
     onHideUploadPanel: () -> Unit,
     importError: String?,
-    onSubmitImport: (following: String, followers: String) -> Unit,
+    onSubmitImport: (following: String, followers: List<String>) -> Unit,
     onOpenFollowing: () -> Unit,
     onOpenFollowers: () -> Unit,
     onOpenNotFollowingBack: () -> Unit,
     onOpenFans: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    var rangeWarningDismissed by remember(lastImportAtSeconds) { mutableStateOf(false) }
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(scrollState).padding(20.dp)) {
             ScreenHeader("Dashboard")
@@ -71,6 +81,31 @@ fun DashboardScreen(
             if (!hasData) {
                 GetStartedCard(error = importError, onSubmit = onSubmitImport)
                 return@Column
+            }
+
+            if (possiblyLimitedRange && !rangeWarningDismissed) {
+                Surface(color = FollowLensColors.surfaceRaised, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = FollowLensColors.accent, modifier = Modifier.size(18.dp))
+                            Text(
+                                "This export might not cover your full history. If you've had Instagram for over a " +
+                                    "year, make sure you pick date range All time when downloading — a shorter range " +
+                                    "silently drops older followers, which can make people who do follow you back " +
+                                    "wrongly show up as \"Not following back.\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = FollowLensColors.textSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onShowUploadPanel) { Text("Re-import") }
+                            TextButton(onClick = { rangeWarningDismissed = true }) { Text("Dismiss") }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
             }
 
             Surface(color = FollowLensColors.surfaceRaised, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
@@ -139,7 +174,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun GetStartedCard(error: String?, onSubmit: (following: String, followers: String) -> Unit) {
+private fun GetStartedCard(error: String?, onSubmit: (following: String, followers: List<String>) -> Unit) {
     Surface(color = FollowLensColors.surfaceRaised, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text("Get started", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = FollowLensColors.accentStrong)

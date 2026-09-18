@@ -3,6 +3,7 @@ package app.followlens.diff
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private fun followersJson(vararg usernames: String): String =
@@ -49,6 +50,55 @@ class FollowDiffTest {
         )
         val result = FollowDiff.compare(snap, whitelist = setOf("bob"))
         assertEquals(listOf("carol"), result.notFollowingBack.map { it.username })
+    }
+
+    @Test
+    fun dismissed_removesFromNotFollowingBackOnly_notFans() {
+        val snap = parser.parseSnapshot(
+            followingFileContent = followingJson("bob", "carol"),
+            followersJson("dave"),
+        )
+        val result = FollowDiff.compare(snap, dismissed = setOf("bob"))
+        assertEquals(listOf("carol"), result.notFollowingBack.map { it.username })
+        assertEquals(listOf("dave"), result.fans.map { it.username })
+    }
+
+    @Test
+    fun possiblyLimitedRange_falseWhenTimestampsSpanOverAYear() {
+        // followingJson/followersJson use fixed 2023-era timestamps, decades before "now".
+        val snap = parser.parseSnapshot(
+            followingFileContent = followingJson("alice"),
+            followersJson("alice"),
+        )
+        val result = FollowDiff.compare(snap)
+        assertFalse(result.possiblyLimitedRange)
+    }
+
+    @Test
+    fun possiblyLimitedRange_trueWhenAllTimestampsAreRecent() {
+        val now = 1_800_000_000L
+        val recent = now - 30 * 86_400L // 30 days ago
+        val json = """{"relationships_following":[
+            {"title":"alice","string_list_data":[{"href":"https://instagram.com/_u/alice","timestamp":$recent}]}
+        ]}"""
+        val snap = parser.parseSnapshot(followingFileContent = json, followersJson("alice"))
+        val result = FollowDiff.compare(snap, nowSeconds = now)
+        assertTrue(result.possiblyLimitedRange)
+    }
+
+    @Test
+    fun possiblyLimitedRange_falseWhenTimestampsAreMostlyMissing() {
+        val now = 1_800_000_000L
+        val recent = now - 30 * 86_400L
+        // Only 1 of 3 following-entries has a timestamp — not enough coverage to trust the signal.
+        val json = """{"relationships_following":[
+            {"title":"a","string_list_data":[{"href":"https://instagram.com/_u/a","timestamp":$recent}]},
+            {"title":"b","string_list_data":[{"href":"https://instagram.com/_u/b"}]},
+            {"title":"c","string_list_data":[{"href":"https://instagram.com/_u/c"}]}
+        ]}"""
+        val snap = parser.parseSnapshot(followingFileContent = json, followersJson("a", "b", "c"))
+        val result = FollowDiff.compare(snap, nowSeconds = now)
+        assertFalse(result.possiblyLimitedRange)
     }
 
     @Test

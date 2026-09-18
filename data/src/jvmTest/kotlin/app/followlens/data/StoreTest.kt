@@ -71,4 +71,32 @@ class StoreTest {
         wl.remove("bob")
         assertEquals(setOf("carol"), wl.all())
     }
+
+    @Test
+    fun dismissed_addAndRemove() {
+        val db = freshDb()
+        val dismissed = DismissedStore(db)
+        assertEquals(emptySet(), dismissed.all())
+
+        dismissed.add("Bob", dismissedAtSeconds = 1)
+        dismissed.add("carol", dismissedAtSeconds = 2)
+        assertEquals(setOf("bob", "carol"), dismissed.all())
+
+        dismissed.remove("bob")
+        assertEquals(setOf("carol"), dismissed.all())
+    }
+
+    @Test
+    fun dismissed_isIndependentFromWhitelist() {
+        val db = freshDb()
+        val wl = WhitelistStore(db)
+        val dismissed = DismissedStore(db)
+
+        wl.add("alice", addedAtSeconds = 1)
+        dismissed.add("alice", dismissedAtSeconds = 1)
+        wl.remove("alice")
+
+        assertEquals(emptySet(), wl.all())
+        assertEquals(setOf("alice"), dismissed.all())
+    }
 }

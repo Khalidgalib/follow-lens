@@ -37,6 +37,13 @@ data class FollowDiffResult(
     val fans: List<Account>,
     /** Mutual follows. */
     val mutuals: List<Account>,
+    /**
+     * Best-effort signal that this export was requested with a date range shorter than "All
+     * time" (Instagram defaults to "Last Year"), which silently omits older relationships from
+     * the file and can make real followers wrongly appear in [notFollowingBack]. See
+     * [FollowDiff.looksRangeLimited].
+     */
+    val possiblyLimitedRange: Boolean = false,
 )
 
 /** Change between a previous snapshot and the current one. */

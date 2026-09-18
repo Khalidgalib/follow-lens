@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -54,6 +55,7 @@ fun AccountListScreen(
     accounts: List<Account>,
     onWhitelist: (String) -> Unit,
     onBack: (() -> Unit)? = null,
+    onMarkHandled: ((String) -> Unit)? = null,
 ) {
     var query by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf(SortMode.RECENT) }
@@ -120,6 +122,11 @@ fun AccountListScreen(
                             }
                             IconButton(onClick = { onWhitelist(account.username) }) {
                                 Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Whitelist", tint = FollowLensColors.textSecondary, modifier = Modifier.size(18.dp))
+                            }
+                            if (onMarkHandled != null) {
+                                IconButton(onClick = { onMarkHandled(account.username) }) {
+                                    Icon(Icons.Outlined.CheckCircleOutline, contentDescription = "Mark handled", tint = FollowLensColors.textSecondary, modifier = Modifier.size(18.dp))
+                                }
                             }
                             IconButton(onClick = { clipboard.setText(AnnotatedString("@${account.username}")) }) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy username", tint = FollowLensColors.textSecondary, modifier = Modifier.size(18.dp))

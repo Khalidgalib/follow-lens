@@ -10,9 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,119 +30,94 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.followlens.diff.ExportParser
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
 import io.github.vinceglb.filekit.core.PlatformFile
 import kotlinx.coroutines.launch
 
 private val importableExtensions = listOf("json", "html", "htm")
 
-private enum class ImportSlot(val label: String) {
-    FOLLOWING("Following"),
-    FOLLOWERS("Followers"),
-}
+private data class PickedFile(val name: String, val content: String, val kind: ExportParser.ExportKind)
 
 /**
- * The "Upload Following" / "Upload Followers" + Analyze UI, embedded in the Dashboard tab (see
+ * The "pick your export files" + Analyze UI, embedded in the Dashboard tab (see
  * [DashboardScreen]) rather than a standalone screen — it's shown by default when there's no
  * imported data yet, and on demand afterwards for re-importing.
+ *
+ * Files are picked all at once (one multi-select instead of two separate single-file pickers) and
+ * classified by content via [ExportParser.detectKind], so the user doesn't have to remember which
+ * button corresponds to which file — and a followers export split across multiple parts
+ * (`followers_1.json`, `followers_2.json`, ...) all just get picked together and merged.
  */
 @Composable
 fun UploadPanel(
     error: String?,
     canCancel: Boolean,
     onCancel: () -> Unit,
-    onSubmit: (following: String, followers: String) -> Unit,
+    onSubmit: (following: String, followers: List<String>) -> Unit,
 ) {
-    var followingContent by remember { mutableStateOf<String?>(null) }
-    var followingFileName by remember { mutableStateOf<String?>(null) }
-    var followingWarning by remember { mutableStateOf<String?>(null) }
-    var followersContent by remember { mutableStateOf<String?>(null) }
-    var followersFileName by remember { mutableStateOf<String?>(null) }
-    var followersWarning by remember { mutableStateOf<String?>(null) }
+    var pickedFiles by remember { mutableStateOf<List<PickedFile>>(emptyList()) }
     var readError by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val parser = remember { ExportParser() }
 
-    fun handlePicked(slot: ImportSlot, file: PlatformFile) {
+    fun setKind(name: String, kind: ExportParser.ExportKind) {
+        pickedFiles = pickedFiles.map { if (it.name == name) it.copy(kind = kind) else it }
+    }
+
+    fun handlePicked(files: List<PlatformFile>) {
         scope.launch {
             try {
-                val content = file.readBytes().decodeToString()
-                val kind = parser.detectKind(content)
-                val mismatch = when (slot) {
-                    ImportSlot.FOLLOWING -> kind == ExportParser.ExportKind.FOLLOWERS
-                    ImportSlot.FOLLOWERS -> kind == ExportParser.ExportKind.FOLLOWING
-                }
-                if (mismatch) {
-                    val detectedLabel = if (kind == ExportParser.ExportKind.FOLLOWING) "Following" else "Followers"
-                    readError = "This looks like a $detectedLabel export — upload it in the $detectedLabel slot instead."
-                    return@launch
-                }
-
-                val warning = if (kind == ExportParser.ExportKind.UNKNOWN) {
-                    "Couldn't confirm this is a ${slot.label} export — double check the file."
-                } else {
-                    null
-                }
-                when (slot) {
-                    ImportSlot.FOLLOWING -> {
-                        followingContent = content
-                        followingFileName = file.name
-                        followingWarning = warning
-                    }
-                    ImportSlot.FOLLOWERS -> {
-                        followersContent = content
-                        followersFileName = file.name
-                        followersWarning = warning
-                    }
+                pickedFiles = files.map { file ->
+                    val content = file.readBytes().decodeToString()
+                    PickedFile(file.name, content, parser.detectKind(content))
                 }
                 readError = null
             } catch (e: Exception) {
-                readError = "Couldn't read ${file.name}: ${e.message}"
+                readError = "Couldn't read one of the files: ${e.message}"
             }
         }
     }
 
-    val followingLauncher = rememberFilePickerLauncher(
+    val launcher = rememberFilePickerLauncher(
         type = PickerType.File(extensions = importableExtensions),
-        onResult = { file -> if (file != null) handlePicked(ImportSlot.FOLLOWING, file) },
+        mode = PickerMode.Multiple(),
+        onResult = { files -> if (files != null) handlePicked(files) },
     )
-    val followersLauncher = rememberFilePickerLauncher(
-        type = PickerType.File(extensions = importableExtensions),
-        onResult = { file -> if (file != null) handlePicked(ImportSlot.FOLLOWERS, file) },
-    )
+
+    val followingFile = pickedFiles.firstOrNull { it.kind == ExportParser.ExportKind.FOLLOWING }
+    val followersFiles = pickedFiles.filter { it.kind == ExportParser.ExportKind.FOLLOWERS }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            "Instagram → Settings → Accounts Center → Your information and permissions → " +
-                "Download your information → Followers and following → JSON or HTML, date range " +
-                "All time. Upload the two files below once the export email arrives.",
-            style = MaterialTheme.typography.bodySmall,
-            color = FollowLensColors.textSecondary,
-        )
+        ImportInstructions()
 
-        UploadCard(
-            label = "Following",
-            fileName = followingFileName,
-            warning = followingWarning,
-            onPick = { followingLauncher.launch() },
-        )
-        UploadCard(
-            label = "Followers",
-            fileName = followersFileName,
-            warning = followersWarning,
-            onPick = { followersLauncher.launch() },
-        )
+        if (pickedFiles.isEmpty()) {
+            Button(onClick = { launcher.launch() }) { Text("Pick your export files") }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                pickedFiles.forEach { file ->
+                    PickedFileRow(file = file, onSetKind = { kind -> setKind(file.name, kind) })
+                }
+            }
+            OutlinedButton(onClick = { launcher.launch() }) { Text("Change files") }
+        }
 
         val shownError = error ?: readError
         if (shownError != null) {
             Text(shownError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        } else if (pickedFiles.isNotEmpty() && (followingFile == null || followersFiles.isEmpty())) {
+            Text(
+                "Pick at least one Following file and one Followers file (use the chips above to correct a file we guessed wrong).",
+                color = FollowLensColors.accent,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { onSubmit(followingContent!!, followersContent!!) },
-                enabled = followingContent != null && followersContent != null,
+                onClick = { onSubmit(followingFile!!.content, followersFiles.map { it.content }) },
+                enabled = followingFile != null && followersFiles.isNotEmpty(),
             ) { Text("Analyze") }
             if (canCancel) OutlinedButton(onClick = onCancel) { Text("Cancel") }
         }
@@ -149,35 +125,73 @@ fun UploadPanel(
 }
 
 @Composable
-private fun UploadCard(label: String, fileName: String?, warning: String?, onPick: () -> Unit) {
+private fun PickedFileRow(file: PickedFile, onSetKind: (ExportParser.ExportKind) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = FollowLensColors.surfaceRaised,
         shape = RoundedCornerShape(14.dp),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(label.uppercase(), style = MaterialTheme.typography.labelMedium, color = FollowLensColors.textTertiary)
-            Spacer(Modifier.height(8.dp))
-            if (fileName == null) {
-                Button(onClick = onPick) { Text("Upload $label file") }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = FollowLensColors.good)
-                    Text(
-                        fileName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FollowLensColors.textPrimary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedButton(onClick = onPick) { Text("Change") }
-                }
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, contentDescription = null, tint = FollowLensColors.textSecondary, modifier = Modifier.size(18.dp))
+                Text(file.name, style = MaterialTheme.typography.bodyMedium, color = FollowLensColors.textPrimary, modifier = Modifier.weight(1f))
             }
-            if (warning != null) {
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = file.kind == ExportParser.ExportKind.FOLLOWING,
+                    onClick = { onSetKind(ExportParser.ExportKind.FOLLOWING) },
+                    label = { Text("Following") },
+                )
+                FilterChip(
+                    selected = file.kind == ExportParser.ExportKind.FOLLOWERS,
+                    onClick = { onSetKind(ExportParser.ExportKind.FOLLOWERS) },
+                    label = { Text("Followers") },
+                )
+            }
+            if (file.kind == ExportParser.ExportKind.UNKNOWN) {
+                Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = FollowLensColors.accent, modifier = Modifier.size(16.dp))
-                    Text(warning, style = MaterialTheme.typography.labelSmall, color = FollowLensColors.accent)
+                    Text(
+                        "Couldn't tell which this is — pick one above.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FollowLensColors.accent,
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportInstructions() {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "1. Open Instagram → your profile → ☰ Menu.\n" +
+                "2. Accounts Center → Your information and permissions.\n" +
+                "3. Download your information → Download or transfer information.\n" +
+                "4. Choose your Instagram account. Leave all information types selected — " +
+                "FollowLens finds the files it needs regardless of what else is in the export, " +
+                "and keeping everything means a future FollowLens feature can reuse this same " +
+                "export without asking you to download again.\n" +
+                "5. Format: JSON (or HTML — both work). Date range: All time.\n" +
+                "6. Submit the request. After a few minutes, go back to this same Download your " +
+                "information section in Instagram and download it directly from there — no need " +
+                "to wait for the email, though Instagram sends one too if you'd rather use that.",
+            style = MaterialTheme.typography.bodySmall,
+            color = FollowLensColors.textSecondary,
+        )
+        Surface(color = FollowLensColors.surfaceRaised, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = FollowLensColors.accent, modifier = Modifier.size(18.dp))
+                Text(
+                    "Date range: All time. Instagram defaults to Last Year — anything shorter " +
+                        "silently drops older followers/following from the file, which makes " +
+                        "people who do follow you back wrongly show up as \"Not following back.\"",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FollowLensColors.accent,
+                )
             }
         }
     }
