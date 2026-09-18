@@ -24,6 +24,19 @@ Replaces an abandoned Spring Boot scaffold that used to live in
 | Brand | **FollowLens.** Never put "Insta", "Gram", or "IG" in the name/icon — stores reject it. |
 | Privacy posture | No account, no network permission in v1. Apple/Play privacy forms = "no data collected". |
 
+## Brand: Galivo (parent company)
+
+**Galivo** is a separate umbrella company identity, not FollowLens itself — FollowLens is the first
+of several apps planned to launch under it (locked decision, the way Microsoft has many products).
+The **canonical Galivo logo** is an abstract "G" mark (a thin ring + inward crossbar) on a soft white
+glow-circle badge, in Galivo's own indigo/cyan palette — that's the actual brand asset, explored and
+finalized in a Claude Artifact this session ("Galivo Logo Concepts"), not defined anywhere in this
+repo. `app/.../ui/GalivoMark.kt` holds only an **app-specific derivative** of that mark's geometry
+(same "G" shape, recolored to a vivid gold + soft glow) sized for FollowLens's own `ScreenHeader` —
+FollowLens intentionally keeps its own warm-gold identity distinct from Galivo's own indigo/cyan, the
+same way Word/Excel/PowerPoint don't all turn Microsoft-blue. Don't "fix" the mark's color back
+toward indigo inside this app without asking — that was tried and explicitly reverted this session.
+
 ## Module layout
 
 - `core-diff/` — pure Kotlin. Parses the IG export (JSON **and** HTML) + does the set math. Zero
@@ -105,25 +118,23 @@ Core algorithm: `notFollowingBack = following − followers` (case-insensitive),
   bump the project's Kotlin version first and re-verify the whole toolchain (this project has a
   history of toolchain fragility — see git log around the AGP/JDK-21 fix-forward).
 
-## Session handoff (2026-09-18) — delete this section once it's stale
+## Session handoff (2026-09-18, later) — delete this section once it's stale
 
-Just landed: the file-upload import feature (commit `e44bdd7`, on branch
-`feat/v1-build-fixes-and-import-ui`). `ImportScreen` now has "Upload Following" / "Upload
-Followers" buttons (FileKit picker) instead of paste boxes; `ExportParser` auto-detects and parses
-either JSON or HTML. All three targets (desktop/iOS-sim/Android) compile clean and
-`:core-diff:jvmTest` passes 16/16 including new HTML-format tests. Not yet done: a full manual
-walkthrough on a real device/simulator with the user's actual real export files.
+Since the earlier handoff (file-upload import, commit `e44bdd7`), landed on
+`feat/v1-build-fixes-and-import-ui`: profile-link icon now opens the web (with a snackbar fallback
+instead of silently doing nothing); theme-wide button ripple via `LocalIndication` +
+`LocalRippleConfiguration` (Material3 components ignore plain `LocalIndication` — both are needed);
+a cross-platform `ScrollPositionIndicator` on all five tabs; Dashboard is now the permanent home
+screen with the upload panel embedded inline instead of gating the whole app behind a separate
+import screen; `ExportParser.detectKind` flags a file dropped in the wrong upload slot (fixed once
+already — its real-HTML-header check initially didn't match the actual export format, see the export
+section above); Dashboard's stat tiles are clickable (Following/Followers open new drill-down
+`AccountListScreen`s with a back button, Not Back jumps to the existing LIST tab, Fans is a new
+fourth tile); and the Galivo brand mark now sits in `ScreenHeader` (see Brand section above). All
+committed; `:core-diff:jvmTest` passes; all three targets (desktop/iOS-sim/Android) compile clean.
 
-**In progress right now**: verifying the real HTML export end-to-end on the iOS Simulator
-(`iosApp/`, already built and installed there — see the Xcode build command above). The user just
-confirmed they successfully dragged their real `following.html` and `followers_1.html` onto the
-Simulator window and saved them to Files → On My iPhone → Downloads. **Next step**: tap "Upload
-Following" in the running app, navigate to that Downloads folder, pick `following.html`; repeat for
-"Upload Followers" with `followers_1.html`; tap Analyze; confirm the Dashboard numbers look right.
-
-Two things already confirmed true about this user's real data (useful context, not a bug to
-re-investigate): their first followers export (56 entries) was date-range-limited, not "All time" —
-they re-exported with All time selected, which is the `followers_1.html` now being tested. Real
-counts should be roughly Following ≈513, Followers ≈619 (both from earlier JSON/text inspection
-this session) — treat a result in that neighborhood as correct, not exact, since export snapshots
-drift from live Instagram state.
+**Not yet done**: the real app icon (iOS `AppIcon` catalog / Android adaptive icon) using the Galivo
+mark — deliberately deferred as separate, bigger work with its own platform safe-zone rules.
+Onboarding and CSV export (build order item 6) haven't been started. No store-submission prep yet
+(item 7) — the user is currently leaning toward Google Play first (one-time $25 fee vs. Apple's
+$99/year), but hasn't enrolled in either developer program yet.

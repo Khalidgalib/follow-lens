@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +33,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,8 +54,16 @@ fun ScreenHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Un
             }
             Spacer(Modifier.width(4.dp))
         } else {
-            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = FollowLensColors.accentStrong, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier.size(30.dp).background(
+                    Brush.radialGradient(listOf(GalivoMarkGold.copy(alpha = 0.55f), Color.Transparent)),
+                    shape = CircleShape,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(GalivoMark, contentDescription = null, tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(4.dp))
         }
         Text(title, style = MaterialTheme.typography.headlineSmall, color = FollowLensColors.accentStrong, fontWeight = FontWeight.SemiBold)
     }

@@ -7,9 +7,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * Dark, brass-accented theme. Ground is warm near-black (never pure black); brass is the one
- * accent, reserved for the primary action and headline figures — everything else stays quiet.
- * Mirrors the palette validated in the FollowLens visual-direction artifact.
+ * Dark, brass-accented theme. Ground is warm near-black (never pure black); a vivid gold is the
+ * one accent, reserved for the primary action and headline figures — everything else stays quiet.
+ * The Galivo brand mark shown in [ScreenHeader] uses its own, brighter gold plus a glow — see
+ * [GalivoMark] — since FollowLens keeps its own identity distinct from Galivo's own indigo/cyan
+ * corporate palette (that's the parent company's brand, not this app's).
  */
 object FollowLensColors {
     val background = Color(0xFF0C0B09)
@@ -22,8 +24,8 @@ object FollowLensColors {
     val textSecondary = Color(0xFFB4A996)
     val textTertiary = Color(0xFF7D7362)
 
-    val accent = Color(0xFFCDA05A)
-    val accentStrong = Color(0xFFE4BD7C)
+    val accent = Color(0xFFE3B268)
+    val accentStrong = Color(0xFFF2CB8C)
     val accentInk = Color(0xFF241A0C)
 
     val seriesFollowers = Color(0xFF3A9BC9)
