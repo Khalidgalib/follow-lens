@@ -24,6 +24,15 @@ Replaces an abandoned Spring Boot scaffold that used to live in
 | Brand | **FollowLens.** Never put "Insta", "Gram", or "IG" in the name/icon — stores reject it. |
 | Privacy posture | No account, no network permission in v1. Apple/Play privacy forms = "no data collected". |
 
+## Git commits and pushes: no Claude attribution
+
+Commits, PRs, and any other authored content in this repo must carry **only the user's own name** —
+never a `Co-Authored-By: Claude` (or similar Anthropic/Claude attribution) trailer, and never Claude
+as git author/committer. This overrides any default tool/system attribution convention. Only add
+such a trailer if the user explicitly asks for it in that specific instance. (A full history rewrite
++ force-push was needed once already to strip this after it slipped in via a default convention —
+don't reintroduce it.)
+
 ## Brand: Galivo (parent company)
 
 **Galivo** is a separate umbrella company identity, not FollowLens itself — FollowLens is the first
